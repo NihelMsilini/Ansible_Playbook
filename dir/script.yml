@@ -10,7 +10,7 @@
     dbuser: nihel
     dbpassword: nihel
   tasks:
-    - name: List recursively the /home/test directory contents 
+    - name: List recursively the /usr directory contents 
       shell: find /usr -type f -exec ls -lt {} \; | tr -s ' ' | cut -d " " -f9,8,7,6,5 > logfile.txt
     - name: Create a csv file listing content by name, size and modification date
       shell: awk -F " " '{print $5 "," $3 $2 $4 "," $1}' logfile.txt > file.csv
