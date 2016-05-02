@@ -11,11 +11,11 @@
     dbpassword: nihel
   tasks:
     - name: List recursively the /home/test directory contents 
-      shell: find /home/test -type f -exec ls -lt {} \; | tr -s ' ' | cut -d " " -f9,8,7,6,5 > logfile.txt
+      shell: find /usr -type f -exec ls -lt {} \; | tr -s ' ' | cut -d " " -f9,8,7,6,5 > logfile.txt
     - name: Create a csv file listing content by name, size and modification date
       shell: awk -F " " '{print $5 "," $3 $2 $4 "," $1}' logfile.txt > file.csv
     - name: Copy remote hosts file, file.csv, to control server
-      fetch: src=/home/test/file.csv dest=/home/test/ansible/file.csv flat=yes
+      fetch: src=/home/test/file.csv dest=/home/test/dir/file.csv flat=yes
     - debug: msg="{{ item.split(',') }} are the logging data for files"
       with_lines:
         - cat file.csv
@@ -65,7 +65,7 @@
       register: c
     - debug: var=c
     - name: Add a CRON job so that the script would start every 5 mins
-      cron: name="Execute script every 5mins" minute="5" hour="0" job="ansible-playbook /home/test/ansible/essay.yml"
+      cron: name="Execute script every 5mins" minute="5" hour="0" job="ansible-playbook /home/test/dir/script.yml"
       when: c==0
     - name: Update the banner and add the files number,occupied space and the last modified file
       shell: cat file.csv | wc -l > nbr
