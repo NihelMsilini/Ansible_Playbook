@@ -38,7 +38,7 @@
       postgresql_user: db={{dbname}} name={{dbuser}} password={{dbpassword}} priv=ALL
     - name: Make sure that the user nihel does not have unnecessary privilege
       postgresql_user: name={{dbuser}} role_attr_flags=NOSUPERUSER,NOCREATEDB
-    - name: Create table logtab containing the size, the date and the path of a file
+    - name: Create table files12 containing the size, the date and the path of a file
       command: psql -d db -U nihel -c "CREATE TABLE IF NOT EXISTS files12 (name varchar(200), date varchar(200), size bigint);"
     - name: Reading lines
       shell: awk -F "," '{print " \047" $1 "\047,\047" $2 "\047," $3 }' file.csv 
