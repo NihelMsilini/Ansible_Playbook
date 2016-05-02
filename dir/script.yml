@@ -1,0 +1,84 @@
+--- # My Playbook for Installing POSTGRES while using Ansible features
+- hosts: aptserver
+  user: test 
+  sudo: yes
+  connection: ssh
+  gather_facts: no
+  vars:
+    motd_value: "{{lookup('file','/etc/motd')}}"
+    dbname: db
+    dbuser: nihel
+    dbpassword: nihel
+  tasks:
+    - name: List recursively the /home/test directory contents 
+      shell: find /home/test -type f -exec ls -lt {} \; | tr -s ' ' | cut -d " " -f9,8,7,6,5 > logfile.txt
+    - name: Create a csv file listing content by name, size and modification date
+      shell: awk -F " " '{print $5 "," $3 $2 $4 "," $1}' logfile.txt > file.csv
+    - name: Copy remote hosts file, file.csv, to control server
+      fetch: src=/home/test/file.csv dest=/home/test/ansible/file.csv flat=yes
+    - debug: msg="{{ item.split(',') }} are the logging data for files"
+      with_lines:
+        - cat file.csv
+    - name: Update all packages 
+      raw: apt-get update
+    - name: Make sure that the apt cache is up to date
+      apt: update_cache=yes
+    - name: Installing Postgresql
+      apt: name={{item}}
+      with_items:
+        - postgresql
+        - libpq-dev
+        - python-psycopg2
+      notify: start postgres
+    - name: Starting Postgresql
+      service: name=postgresql state=restarted   
+    - name: Make sure the database is created
+      postgresql_db: name={{dbname}}
+    - name: Make sure that the user has access to database
+      postgresql_user: db={{dbname}} name={{dbuser}} password={{dbpassword}} priv=ALL
+    - name: Make sure that the user nihel does not have unnecessary privilege
+      postgresql_user: name={{dbuser}} role_attr_flags=NOSUPERUSER,NOCREATEDB
+    - name: Create table logtab containing the size, the date and the path of a file
+      command: psql -d db -U nihel -c "CREATE TABLE IF NOT EXISTS files12 (name varchar(200), date varchar(200), size bigint);"
+    - name: Reading lines
+      shell: awk -F "," '{print " \047" $1 "\047,\047" $2 "\047," $3 }' file.csv 
+      register: line 
+    - debug: var=line
+    - name: Calculate the total space of the files with an sql request
+      shell: psql -d db -U nihel -c "SELECT SUM(size) FROM files12;" 
+      register: res
+    - debug: var=res 
+    - name: Get the total size
+      raw: echo {{ res }}  > totalsize.txt
+    - name: Add the result to the log file /var/log/syslog.conf
+      raw: sed -n 3p totalsize.txt >> /var/log/syslog.conf
+    - name: Table insertion
+      command: psql -d db -U nihel -c "INSERT INTO files12 VALUES ({{ item }});"     
+      with_items:
+        - "{{ line.stdout_lines}}" 
+    - name: Display data from table
+      command: psql -d db -U nihel -c "SELECT * FROM files12;"
+      register: result
+    - debug: var=result
+    - name: Verify if the script exists in the crontab of the server 
+      shell: crontab -l >> cron.txt | wc -l
+      register: c
+    - debug: var=c
+    - name: Add a CRON job so that the script would start every 5 mins
+      cron: name="Execute script every 5mins" minute="5" hour="0" job="ansible-playbook /home/test/ansible/essay.yml"
+      when: c==0
+    - name: Update the banner and add the files number,occupied space and the last modified file
+      shell: cat file.csv | wc -l > nbr
+    - shell: awk -F " "  '{print  $1 }' nbr > nblines
+    - shell: cat nblines
+      register: nblines
+    - debug: var=nblines
+    - shell: echo "File numbers under /usr is {{ item }}" > /etc/motd
+      with_items: "{{ line_nbr.stdout_lines }} "
+    - shell: echo "File space under /usr is {{ item }}" >> /etc/motd
+      with_items: "{{ res.stdout_lines }} "
+    - debug: msg= "motd value is{{ motd_value }}"
+  handlers:
+    - name: start postgres
+      service: name=postgresql state=restarted
+   
